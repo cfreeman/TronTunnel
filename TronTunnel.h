@@ -19,7 +19,7 @@
 #ifndef _TRON_TUNNEL_ACH_
 #define _TRON_TUNNEL_ACH_
 
-#define SMOOTH_SIZE 10
+#define SMOOTH_SIZE 5
 
 typedef struct {
   int t;						// The trigger pin of the ultrasonic sensor.

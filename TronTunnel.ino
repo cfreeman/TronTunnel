@@ -19,6 +19,7 @@
 #include "ESP8266WiFi.h"
 #include "ESP8266WiFiGeneric.h"
 #include "ESP8266WifiAP.h"
+#include "ESP8266HTTPClient.h"
 #include "TronTunnel.h"
 
 extern "C" {
@@ -67,34 +68,24 @@ void setup() {
   ultrasonic = initUltrasonic(4, 5);
 }
 
-void sendPosition(IPAddress addr, float pos) {
-  WiFiClient client;
-  if (!client.connect(addr, 80)) {
-    Serial.println("Unable to connect to client.");
-    return;
-  }
-
-  client.print(String("GET ") + "/update?p=" + String(pos) + " HTTP/1.1\r\n"+
-               "Host: " + addr.toString() + "\r\n" +
-               "Connection: close\r\n\r\n");
-
-  client.stop();
-}
-
 void loop() {
   float ud = getDistance(&ultrasonic);
   float n = std::min(1.0, (ud / 187.0));
 
-  // Get the IP addresses of all the clients connected to the ACCESS point.
+  // Get the IP addresses of all the clients connected to this AP.
   station_info *stat_info = wifi_softap_get_station_info();
   while (stat_info != NULL) {
     struct ip_addr *ipaddr;
 
     ipaddr = &stat_info->ip;
-    sendPosition(ipaddr->addr, n);
+    IPAddress addr = ipaddr->addr;
+
+    HTTPClient http;
+    http.begin(addr.toString(), 80,  "/update?p=" + String(n));
+    http.GET();
 
     stat_info = STAILQ_NEXT(stat_info, next);
   }
 
-  delay(100);
+  delay(25);
 }
