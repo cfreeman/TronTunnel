@@ -87,5 +87,5 @@ void loop() {
     stat_info = STAILQ_NEXT(stat_info, next);
   }
 
-  delay(25);
+  delay(250);
 }
