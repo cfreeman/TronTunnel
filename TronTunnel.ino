@@ -90,7 +90,6 @@ void loop() {
     stat_info = STAILQ_NEXT(stat_info, next);
     
   }
-  //Serial.println(millis());
-  delay(25);
-  //Serial.println(millis());
+  Serial.println(millis());
+  delay(70);
 }
