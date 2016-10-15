@@ -33,6 +33,9 @@ extern "C" {
 
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
+
+
+
 Ultrasonic ultrasonic;
 
 Ultrasonic initUltrasonic(int trigger, int echo) {
@@ -85,7 +88,9 @@ void loop() {
     http.GET();
 
     stat_info = STAILQ_NEXT(stat_info, next);
+    
   }
-
-  delay(250);
+  //Serial.println(millis());
+  delay(25);
+  //Serial.println(millis());
 }
