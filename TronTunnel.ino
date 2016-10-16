@@ -19,7 +19,7 @@
 #include "ESP8266WiFi.h"
 #include "ESP8266WiFiGeneric.h"
 #include "ESP8266WifiAP.h"
-#include "ESP8266HTTPClient.h"
+#include "WiFiUDP.h"
 #include "TronTunnel.h"
 
 extern "C" {
@@ -31,12 +31,12 @@ extern "C" {
   #include "user_interface.h"
 }
 
+WiFiUDP udp;
+IPAddress broadcastIP(192,168,4,255);
+unsigned int udpPort = 4210;
+Ultrasonic ultrasonic;
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
-
-
-
-Ultrasonic ultrasonic;
 
 Ultrasonic initUltrasonic(int trigger, int echo) {
   pinMode(trigger, OUTPUT);
@@ -69,27 +69,19 @@ void setup() {
 
   Serial.begin(9600);
   ultrasonic = initUltrasonic(4, 5);
+
+  udp.begin(udpPort);
 }
 
 void loop() {
   float ud = getDistance(&ultrasonic);
   float n = std::min(1.0, (ud / 187.0));
 
-  // Get the IP addresses of all the clients connected to this AP.
-  station_info *stat_info = wifi_softap_get_station_info();
-  while (stat_info != NULL) {
-    struct ip_addr *ipaddr;
+  udp.beginPacketMulticast(broadcastIP, udpPort, WiFi.softAPIP());
+  char position[255];
+  String(n).toCharArray(position, 255);
+  udp.write(position);
+  udp.endPacket();
 
-    ipaddr = &stat_info->ip;
-    IPAddress addr = ipaddr->addr;
-
-    HTTPClient http;
-    http.begin(addr.toString(), 80,  "/update?p=" + String(n));
-    http.GET();
-
-    stat_info = STAILQ_NEXT(stat_info, next);
-    
-  }
-  Serial.println(millis());
-  delay(70);
+  delay(25);
 }
