@@ -46,7 +46,7 @@ Ultrasonic initUltrasonic(int trigger, int echo) {
   pinMode(trigger, OUTPUT);
   pinMode(echo, INPUT);
 
-  return (Ultrasonic) {trigger, echo, 0, {0.0, 0.0, 0.0, 0.0, 0.0}};
+  return (Ultrasonic) {trigger, echo, Smoother<float>(10)};
 }
 
 // getDistance returns the distance in centimetres from any detected
@@ -58,15 +58,9 @@ float getDistance(Ultrasonic *u) {
   digitalWrite(u->t, LOW);
 
   long duration = pulseIn(u->e, HIGH);
-  u->smooth[u->s] = _min(200.0, (duration/2) / 29.412);
-  u->s = (u->s + 1) % SMOOTH_SIZE;
+  float distance = _min(200.0, (duration/2) / 29.412);
 
-  float res = 0.0;
-  for (int i = 0; i < SMOOTH_SIZE; i++) {
-    res = res + u->smooth[i];
-  }
-
-  return (res / (float)SMOOTH_SIZE);
+  return u->s.Smooth(distance);
 }
 
 void setup() {

@@ -16,26 +16,29 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef _TRON_TUNNEL_ACH_
-#define _TRON_TUNNEL_ACH_
+#ifndef _SMOOTHER_ACH_
+#define _SMOOTHER_ACH_
 
-#include "Smoother.h"
+#include "Arduino.h"
 
-#define SMOOTH_SIZE 5
+template<typename T>
+class Smoother {
+public:
+	Smoother(int len=20) : _idx(0), _len(len), _total(0), _data(new T[len]) { };
+	T Smooth(T v) {
+		_total = _total - _data[_idx];
+		_data[_idx] = v;
+		_total = _total + _data[_idx];
+		_idx = (_idx + 1) % _len;
 
-typedef struct {
-  int t;						// The trigger pin of the ultrasonic sensor.
-  int e;						// The echo pin of the ultrasonic sensor.
-  Smoother<float> s;
-  //int s;						// The index of the smoothing array we are currently updating.
-  //float smooth[SMOOTH_SIZE];	// An array of readings used for averaging the sensor output.
-} Ultrasonic;
-
-// initUltrasconic initalises an ultrasonic sensor with the supplied trigger and echo pin numbers.
-Ultrasonic initUltrasonic(int trigger, int echo);
-
-// getDistance returns the distance in centimetres of an objects detected by the ultrasonic sensor 'u'.
-// The maximum value getDistance will return is 200.
-float getDistance(Ultrasonic *u);
+		return (_total / (T)_len);
+	};
+	~Smoother() { delete[] _data; };
+private:
+	int _idx;
+	int _len;
+	T _total;
+	T* _data;
+};
 
 #endif
