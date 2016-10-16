@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Clinton Freeman 2016
+ * Copyright (c) Clinton Freeman & Kurt Schoenhoff 2016
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -31,13 +31,17 @@ extern "C" {
   #include "user_interface.h"
 }
 
+// Underlying hardware.
 WiFiUDP udp;
-IPAddress broadcastIP(192,168,4,255);
-unsigned int udpPort = 4210;
 Ultrasonic ultrasonic;
+
+// Credentials for this Access Point (AP).
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
+const int udpPort = 4210;
 
+// initUltrasonic configures an ultrasonic sensor on the supplied trigger
+// and echo pins.
 Ultrasonic initUltrasonic(int trigger, int echo) {
   pinMode(trigger, OUTPUT);
   pinMode(echo, INPUT);
@@ -45,6 +49,8 @@ Ultrasonic initUltrasonic(int trigger, int echo) {
   return (Ultrasonic) {trigger, echo, 0, {0.0, 0.0, 0.0, 0.0, 0.0}};
 }
 
+// getDistance returns the distance in centimetres from any detected
+// obstacles from the supplied ultrasonic sensor.
 float getDistance(Ultrasonic *u) {
   // Pulse the trigger pin and wait for an echo.
   digitalWrite(u->t, HIGH);
@@ -77,7 +83,7 @@ void loop() {
   float ud = getDistance(&ultrasonic);
   float n = std::min(1.0, (ud / 187.0));
 
-  udp.beginPacketMulticast(broadcastIP, udpPort, WiFi.softAPIP());
+  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
   char position[255];
   String(n).toCharArray(position, 255);
   udp.write(position);
