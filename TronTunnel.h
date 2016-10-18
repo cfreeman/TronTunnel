@@ -19,14 +19,11 @@
 #ifndef _TRON_TUNNEL_ACH_
 #define _TRON_TUNNEL_ACH_
 
-#include "Smoother.h"
-
 #define SMOOTH_SIZE 20
 
 typedef struct {
   int t;						// The trigger pin of the ultrasonic sensor.
   int e;						// The echo pin of the ultrasonic sensor.
-  //Smoother<float> s;
   int s;						// The index of the smoothing array we are currently updating.
   float smoothSum;
   float smooth[SMOOTH_SIZE];	// An array of readings used for averaging the sensor output.
