@@ -22,6 +22,7 @@
 #include "WiFiUDP.h"
 #include "TronTunnel.h"
 
+
 extern "C" {
   #include "c_types.h"
   #include "ets_sys.h"
@@ -34,6 +35,8 @@ extern "C" {
 // Underlying hardware.
 WiFiUDP udp;
 Ultrasonic ultrasonic;
+
+os_timer_t broadcastTimer;
 
 // Credentials for this Access Point (AP).
 const char* ssid = "tron-tunnel";
@@ -60,6 +63,8 @@ float getDistance(Ultrasonic *u) {
   long duration = pulseIn(u->e, HIGH);
   float distance = _min(200.0, (duration/2) / 29.412);
 
+  // Smooth out the ditance readings to help filter out
+  // any noise.
   u->smoothSum = u->smoothSum - u->smooth[u->s];
   u->smooth[u->s] = distance;
   u->smoothSum = u->smoothSum + u->smooth[u->s];
@@ -68,29 +73,33 @@ float getDistance(Ultrasonic *u) {
   return u->smoothSum / (float) SMOOTH_SIZE;
 }
 
+void broadcast(void *arg) {
+  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
+  char position[255];
+
+  // Get the current position to send.
+  float ud = getDistance((Ultrasonic*) arg);
+  float n = std::min(1.0, (ud / 187.0));
+  String(n).toCharArray(position, 255);
+
+  udp.write(position);
+  udp.endPacket();
+}
+
 void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
 
   Serial.begin(9600);
   ultrasonic = initUltrasonic(4, 5);
-
   udp.begin(udpPort);
+
+  os_timer_disarm(&broadcastTimer);
+  os_timer_setfn(&broadcastTimer, broadcast, &ultrasonic);
+  os_timer_arm(&broadcastTimer, 70, true);
 }
 
 void loop() {
-  float ud = getDistance(&ultrasonic);
-  float n = std::min(1.0, (ud / 187.0));
-
-  //Serial.print("distance: ");
-  //Serial.println(ud);
-  //float n = 0.0;
-
-  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
-  char position[255];
-  String(n).toCharArray(position, 255);
-  udp.write(position);
-  udp.endPacket();
-
-  delay(70);
+  getDistance(&ultrasonic); //Update the internal smoothing buffer
+  delay(10);
 }
