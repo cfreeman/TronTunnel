@@ -96,7 +96,7 @@ void setup() {
 
   os_timer_disarm(&broadcastTimer);
   os_timer_setfn(&broadcastTimer, broadcast, &ultrasonic);
-  os_timer_arm(&broadcastTimer, 70, true);
+  os_timer_arm(&broadcastTimer, 40, true);
 }
 
 void loop() {
