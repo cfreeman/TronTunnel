@@ -46,7 +46,7 @@ Ultrasonic initUltrasonic(int trigger, int echo) {
   pinMode(trigger, OUTPUT);
   pinMode(echo, INPUT);
 
-  return (Ultrasonic) {trigger, echo, Smoother<float>(10)};
+  return (Ultrasonic) {trigger, echo, 0, 0.0, {0.0}};
 }
 
 // getDistance returns the distance in centimetres from any detected
@@ -60,7 +60,12 @@ float getDistance(Ultrasonic *u) {
   long duration = pulseIn(u->e, HIGH);
   float distance = _min(200.0, (duration/2) / 29.412);
 
-  return u->s.Smooth(distance);
+  u->smoothSum = u->smoothSum - u->smooth[u->s];
+  u->smooth[u->s] = distance;
+  u->smoothSum = u->smoothSum + u->smooth[u->s];
+  u->s = (u->s + 1) % SMOOTH_SIZE;
+
+  return u->smoothSum / (float) SMOOTH_SIZE;
 }
 
 void setup() {
@@ -77,11 +82,15 @@ void loop() {
   float ud = getDistance(&ultrasonic);
   float n = std::min(1.0, (ud / 187.0));
 
+  //Serial.print("distance: ");
+  //Serial.println(ud);
+  //float n = 0.0;
+
   udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
   char position[255];
   String(n).toCharArray(position, 255);
   udp.write(position);
   udp.endPacket();
 
-  delay(25);
+  delay(70);
 }

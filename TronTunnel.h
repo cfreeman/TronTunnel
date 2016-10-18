@@ -21,14 +21,15 @@
 
 #include "Smoother.h"
 
-#define SMOOTH_SIZE 5
+#define SMOOTH_SIZE 20
 
 typedef struct {
   int t;						// The trigger pin of the ultrasonic sensor.
   int e;						// The echo pin of the ultrasonic sensor.
-  Smoother<float> s;
-  //int s;						// The index of the smoothing array we are currently updating.
-  //float smooth[SMOOTH_SIZE];	// An array of readings used for averaging the sensor output.
+  //Smoother<float> s;
+  int s;						// The index of the smoothing array we are currently updating.
+  float smoothSum;
+  float smooth[SMOOTH_SIZE];	// An array of readings used for averaging the sensor output.
 } Ultrasonic;
 
 // initUltrasconic initalises an ultrasonic sensor with the supplied trigger and echo pin numbers.
