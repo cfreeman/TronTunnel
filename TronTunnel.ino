@@ -20,8 +20,7 @@
 #include "ESP8266WiFiGeneric.h"
 #include "ESP8266WifiAP.h"
 #include "WiFiUDP.h"
-#include "TronTunnel.h"
-
+#include "NewPing.h"
 
 extern "C" {
   #include "c_types.h"
@@ -34,72 +33,48 @@ extern "C" {
 
 // Underlying hardware.
 WiFiUDP udp;
-Ultrasonic ultrasonic;
-
-os_timer_t broadcastTimer;
+NewPing sonar(4, 5, 200);
 
 // Credentials for this Access Point (AP).
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
 const int udpPort = 4210;
 
-// initUltrasonic configures an ultrasonic sensor on the supplied trigger
-// and echo pins.
-Ultrasonic initUltrasonic(int trigger, int echo) {
-  pinMode(trigger, OUTPUT);
-  pinMode(echo, INPUT);
-
-  return (Ultrasonic) {trigger, echo, 0, 0.0, {0.0}};
-}
-
-// getDistance returns the distance in centimetres from any detected
-// obstacles from the supplied ultrasonic sensor.
-float getDistance(Ultrasonic *u) {
-  // Pulse the trigger pin and wait for an echo.
-  digitalWrite(u->t, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(u->t, LOW);
-
-  long duration = pulseIn(u->e, HIGH);
-  float distance = _min(200.0, (duration/2) / 29.412);
-
-  // Smooth out the ditance readings to help filter out
-  // any noise.
-  u->smoothSum = u->smoothSum - u->smooth[u->s];
-  u->smooth[u->s] = distance;
-  u->smoothSum = u->smoothSum + u->smooth[u->s];
-  u->s = (u->s + 1) % SMOOTH_SIZE;
-
-  return u->smoothSum / (float) SMOOTH_SIZE;
-}
-
-void broadcast(void *arg) {
-  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
-  char position[255];
-
-  // Get the current position to send.
-  float ud = getDistance((Ultrasonic*) arg);
-  float n = std::min(1.0, (ud / 187.0));
-  String(n).toCharArray(position, 255);
-
-  udp.write(position);
-  udp.endPacket();
-}
+// Smoothing array for cleaning up noise in the ultrasonic.
+#define SMOOTH_SIZE 10
+int smooth[SMOOTH_SIZE];
+int smoothSum;
+int s;
 
 void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
 
   Serial.begin(9600);
-  ultrasonic = initUltrasonic(4, 5);
   udp.begin(udpPort);
 
-  os_timer_disarm(&broadcastTimer);
-  os_timer_setfn(&broadcastTimer, broadcast, &ultrasonic);
-  os_timer_arm(&broadcastTimer, 40, true);
+  smoothSum = 0;
+  s = 0;
 }
 
 void loop() {
-  getDistance(&ultrasonic); //Update the internal smoothing buffer
-  delay(10);
+  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
+  char position[255];
+
+  int uS = sonar.ping();
+  int cm = uS / US_ROUNDTRIP_CM;
+
+  smoothSum = smoothSum - smooth[s];
+  smooth[s] = cm;
+  smoothSum = smoothSum + smooth[s];
+  s = (s + 1) % SMOOTH_SIZE;
+
+  float n = std::min(1.0, ((smoothSum/SMOOTH_SIZE) / 187.0));
+  String(n).toCharArray(position, 255);
+
+  udp.write(position);
+  udp.endPacket();
+
+  Serial.println(n);
+  delay(50);
 }
