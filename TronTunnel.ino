@@ -33,18 +33,42 @@ extern "C" {
 
 // Underlying hardware.
 WiFiUDP udp;
-NewPing sonar(4, 5, 200);
+NewPing s1(4, 5, 200);
+NewPing s2(2, 0, 200);
 
 // Credentials for this Access Point (AP).
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
 const int udpPort = 4210;
 
-// Smoothing array for cleaning up noise in the ultrasonic.
-#define SMOOTH_SIZE 10
-int smooth[SMOOTH_SIZE];
-int smoothSum;
-int s;
+// Calibration.
+// typedef struct {
+//   float upperN;
+//   float lowerN;
+//   int uppperCM;
+//   int lowerCM;
+// } calibration;
+
+// s1C = {0.25, }
+
+
+// Smoothing array for cleaning noise in ultrasonic measurements.
+#define SMOOTH_SIZE 5
+typedef struct {
+  int smooth[SMOOTH_SIZE];
+  int smoothSum;
+  int s;
+} smoother;
+smoother sm1, sm2;
+
+int smooth(smoother *sm, int v) {
+  sm->smoothSum = sm->smoothSum - sm->smooth[sm->s];
+  sm->smooth[sm->s] = v;
+  sm->smoothSum = sm->smoothSum + sm->smooth[sm->s];
+  sm->s = (sm->s + 1) % SMOOTH_SIZE;
+
+  return (sm->smoothSum/SMOOTH_SIZE);
+}
 
 void setup() {
   WiFi.mode(WIFI_AP);
@@ -53,28 +77,34 @@ void setup() {
   Serial.begin(9600);
   udp.begin(udpPort);
 
-  smoothSum = 0;
-  s = 0;
+  sm1 = {{0}, 0, 0};
+  sm2 = {{0}, 0, 0};
 }
 
 void loop() {
-  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
-  char position[255];
-
-  int uS = sonar.ping();
+  int uS = s1.ping();
   int cm = uS / US_ROUNDTRIP_CM;
 
-  smoothSum = smoothSum - smooth[s];
-  smooth[s] = cm;
-  smoothSum = smoothSum + smooth[s];
-  s = (s + 1) % SMOOTH_SIZE;
+  Serial.print("S1=");
+  Serial.println(smooth(&sm1, cm));
 
-  float n = std::min(1.0, ((smoothSum/SMOOTH_SIZE) / 187.0));
-  String(n).toCharArray(position, 255);
-
-  udp.write(position);
-  udp.endPacket();
-
-  Serial.println(n);
   delay(50);
+  uS = s2.ping();
+  cm = uS / US_ROUNDTRIP_CM;
+
+  Serial.print("S2=");
+  Serial.println(smooth(&sm2, cm));
+
+  //udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
+  //char position[255];
+
+  // TODO: BLEND measurements between the two sensors.
+
+  // float n = std::min(1.0, (???);
+  // String(n).toCharArray(position, 255);
+  // Serial.println(n);
+
+  // udp.write(position);
+  // udp.endPacket();
+
 }
