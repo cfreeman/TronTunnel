@@ -31,40 +31,22 @@ extern "C" {
   #include "user_interface.h"
 }
 
-// Underlying hardware.
-WiFiUDP udp;
-NewPing s1(4, 5, 200);
-NewPing s2(2, 0, 200);
-
 // Credentials for this Access Point (AP).
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
 const int udpPort = 4210;
 
-const int s2Handover = 60;
-const float nHandover = 1.2;
-
-// Calibration.
-// typedef struct {
-//   float upperN;
-//   float lowerN;
-//   int uppperCM;
-//   int lowerCM;
-// } calibration;
-
-// s1C = {0.25, }
-
-
 // Smoothing array for cleaning noise in ultrasonic measurements.
 #define SMOOTH_SIZE 5
 typedef struct {
+  NewPing sonar;
+
   int smooth[SMOOTH_SIZE];
   int smoothSum;
   int s;
-} smoother;
-smoother sm1, sm2;
+} Tripwire;
 
-int smooth(smoother *sm, int v) {
+int smooth(Tripwire *sm, int v) {
   sm->smoothSum = sm->smoothSum - sm->smooth[sm->s];
   sm->smooth[sm->s] = v;
   sm->smoothSum = sm->smoothSum + sm->smooth[sm->s];
@@ -73,6 +55,21 @@ int smooth(smoother *sm, int v) {
   return (sm->smoothSum/SMOOTH_SIZE);
 }
 
+// Underlying hardware.
+#define NUM_TRIP_WIRES 2
+#define COOLDOWN 4000
+#define TRIP_UPPER 60
+#define TRIP_LOWER 30
+WiFiUDP udp;
+Tripwire trap[NUM_TRIP_WIRES] = {
+  {NewPing(4, 5, 200), {0}, 0, 0},
+  {NewPing(2, 0, 200), {0}, 0, 0}
+};
+
+// Sensor state.
+float currentPos;
+unsigned long lastTrip;
+
 void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
@@ -80,45 +77,32 @@ void setup() {
   Serial.begin(9600);
   udp.begin(udpPort);
 
-  sm1 = {{0}, 0, 0};
-  sm2 = {{0}, 0, 0};
+  currentPos = 0.0;
+  lastTrip = millis();
 }
 
 void loop() {
-  int uS = s1.ping();
-  int s1CM = smooth(&sm1, (uS / US_ROUNDTRIP_CM));
+  for (int i = 0; i < NUM_TRIP_WIRES; i++) {
+    int uS = trap[i].sonar.ping();
+    int cm = smooth(&trap[i], (uS / US_ROUNDTRIP_CM));
 
-  Serial.print("S1=");
-  Serial.println(s1CM);
+    if (cm > TRIP_LOWER && cm < TRIP_UPPER) {
+      currentPos = (i + 1) / (float) (NUM_TRIP_WIRES + 1);
+      lastTrip = millis();
+    }
 
-  delay(50);
-  uS = s2.ping();
-  int s2CM = smooth(&sm2, (uS / US_ROUNDTRIP_CM));
+    delay(33);
+  }
 
-  Serial.print("S2=");
-  Serial.println(s2CM);
-
-  float n = 0.0;
-  // if (s1CM < 140) {
-  //   //60   0.3 0.15
-  //   //140  1.2 0.6
-  //   n = ((s1CM / 140.0) * 0.6);
-  // } else {
-  //   //50 1.2 0.6
-  //   //130 2.0 1.0
-
-  //   n =
-
-  // }
-
-  Serial.print("N=");
-  Serial.println(n);
-
-  // TODO: BLEND measurements between the two sensors.
+  // If we haven't detected any trips in a long while, drop
+  // back down to zero.
+  if ((millis() - lastTrip) > COOLDOWN) {
+    currentPos = 0.0;
+  }
 
   udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
-  char position[255];
-  String(n).toCharArray(position, 255);
-  udp.write(position);
+  char buffer[255];
+  String(currentPos).toCharArray(buffer, 255);
+  udp.write(buffer);
   udp.endPacket();
 }
