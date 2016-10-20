@@ -41,6 +41,9 @@ const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
 const int udpPort = 4210;
 
+const int s2Handover = 60;
+const float nHandover = 1.2;
+
 // Calibration.
 // typedef struct {
 //   float upperN;
@@ -83,28 +86,39 @@ void setup() {
 
 void loop() {
   int uS = s1.ping();
-  int cm = uS / US_ROUNDTRIP_CM;
+  int s1CM = smooth(&sm1, (uS / US_ROUNDTRIP_CM));
 
   Serial.print("S1=");
-  Serial.println(smooth(&sm1, cm));
+  Serial.println(s1CM);
 
   delay(50);
   uS = s2.ping();
-  cm = uS / US_ROUNDTRIP_CM;
+  int s2CM = smooth(&sm2, (uS / US_ROUNDTRIP_CM));
 
   Serial.print("S2=");
-  Serial.println(smooth(&sm2, cm));
+  Serial.println(s2CM);
 
-  //udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
-  //char position[255];
+  float n = 0.0;
+  // if (s1CM < 140) {
+  //   //60   0.3 0.15
+  //   //140  1.2 0.6
+  //   n = ((s1CM / 140.0) * 0.6);
+  // } else {
+  //   //50 1.2 0.6
+  //   //130 2.0 1.0
+
+  //   n =
+
+  // }
+
+  Serial.print("N=");
+  Serial.println(n);
 
   // TODO: BLEND measurements between the two sensors.
 
-  // float n = std::min(1.0, (???);
-  // String(n).toCharArray(position, 255);
-  // Serial.println(n);
-
-  // udp.write(position);
-  // udp.endPacket();
-
+  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
+  char position[255];
+  String(n).toCharArray(position, 255);
+  udp.write(position);
+  udp.endPacket();
 }
