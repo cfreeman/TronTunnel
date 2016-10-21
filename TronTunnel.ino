@@ -35,6 +35,13 @@ extern "C" {
 const char* ssid = "tron-tunnel";
 const char* password = "tq9Zjk23";
 const int udpPort = 4210;
+IPAddress multicast_ip_addr(239, 255, 255, 250);
+
+IPAddress masterIP(192,168,0,10);
+IPAddress gateway(192, 168, 1, 1); // set gateway to match your network
+IPAddress subnet(255, 255, 255, 0); // set subnet mask to match your
+
+
 
 // Smoothing array for cleaning noise in ultrasonic measurements.
 #define SMOOTH_SIZE 5
@@ -73,11 +80,24 @@ float currentPos;
 unsigned long lastTrip;
 
 void setup() {
-  delay(2000);
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
-
+  delay(2000);  // Give the sensor / master ESP8266 a couple of seconds head start.
   Serial.begin(9600);
+
+  // Added to prevent having to power cycle after upload.
+  WiFi.disconnect();
+
+  // Connect to the Access Point / sensor / master ESP8266.
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  WiFi.config(masterIP, gateway, subnet);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi Connected!");
+
   udp.begin(udpPort);
 
   currentPos = 0.0;
@@ -114,7 +134,7 @@ void loop() {
 
   Serial.println(currentPos);
 
-  udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
+  udp.beginPacketMulticast(multicast_ip_addr, udpPort, WiFi.localIP());
   char buffer[255];
   String(currentPos).toCharArray(buffer, 255);
   udp.write(buffer);
