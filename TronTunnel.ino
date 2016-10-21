@@ -56,14 +56,16 @@ int smooth(Tripwire *sm, int v) {
 }
 
 // Underlying hardware.
-#define NUM_TRIP_WIRES 2
-#define COOLDOWN 4000
-#define TRIP_UPPER 60
-#define TRIP_LOWER 30
+#define NUM_TRIP_WIRES 4
+#define COOLDOWN 1000
+#define TRIP_UPPER 120
+#define TRIP_LOWER 60
 WiFiUDP udp;
 Tripwire trap[NUM_TRIP_WIRES] = {
-  {NewPing(4, 5, 200), {0}, 0, 0},
-  {NewPing(2, 0, 200), {0}, 0, 0}
+  {NewPing(2, 15, 140), {0}, 0, 0},
+  {NewPing(0, 13, 140), {0}, 0, 0},
+  {NewPing(4, 12, 140), {0}, 0, 0},
+  {NewPing(5, 14, 140), {0}, 0, 0}
 };
 
 // Sensor state.
@@ -71,6 +73,7 @@ float currentPos;
 unsigned long lastTrip;
 
 void setup() {
+  delay(2000);
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
 
@@ -82,6 +85,7 @@ void setup() {
 }
 
 void loop() {
+  //for (int i = (NUM_TRIP_WIRES - 1); i >= 0; i--) {
   for (int i = 0; i < NUM_TRIP_WIRES; i++) {
     int uS = trap[i].sonar.ping();
     int cm = smooth(&trap[i], (uS / US_ROUNDTRIP_CM));
@@ -89,9 +93,17 @@ void loop() {
     if (cm > TRIP_LOWER && cm < TRIP_UPPER) {
       currentPos = (i + 1) / (float) (NUM_TRIP_WIRES + 1);
       lastTrip = millis();
+      //break;
     }
 
-    delay(33);
+    // if (i == 3) {
+    //   Serial.print("s");
+    //   Serial.print(i);
+    //   Serial.print("=");
+    //   Serial.println(cm);
+    // }
+
+    delay(50);
   }
 
   // If we haven't detected any trips in a long while, drop
@@ -100,9 +112,12 @@ void loop() {
     currentPos = 0.0;
   }
 
+  Serial.println(currentPos);
+
   udp.beginPacketMulticast(IPAddress(192,168,4,255), udpPort, WiFi.softAPIP());
   char buffer[255];
   String(currentPos).toCharArray(buffer, 255);
   udp.write(buffer);
   udp.endPacket();
+  delay(50);
 }
